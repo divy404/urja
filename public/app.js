@@ -5,7 +5,6 @@ let mapInstance = null;
 let mapMarkers = [];
 let chartInstance = null;
 
-// Tab switcher
 function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -28,7 +27,6 @@ function switchTab(tabId) {
   }
 }
 
-// Fetch and display health & aggregate telemetry
 async function loadHealth() {
   try {
     const res = await fetch('/api/v1/health');
@@ -38,7 +36,6 @@ async function loadHealth() {
     document.getElementById('totalMeters').innerText = health.counts.meters;
     document.getElementById('totalTransformers').innerText = health.counts.transformers;
 
-    // Fetch sample meters to get status breakdown
     const mRes = await fetch('/api/v1/meters?limit=100');
     const mData = await mRes.json();
     const installed = mData.data.filter(m => m.installStatus === 'Installed').length;
@@ -54,7 +51,6 @@ async function loadHealth() {
   }
 }
 
-// Debounced search
 function debounceSearch() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
@@ -62,7 +58,6 @@ function debounceSearch() {
   }, 300);
 }
 
-// Load and render meters table
 async function loadMeters(page = 1) {
   currentPage = page;
   const search = document.getElementById('meterSearch')?.value || '';
@@ -97,14 +92,14 @@ async function loadMeters(page = 1) {
         <td><span class="meter-link" onclick="openMeterDetails('${m.meterId}')">${m.meterId}</span></td>
         <td style="font-family: var(--font-mono);">${m.serialNo}</td>
         <td><strong>${m.make}</strong></td>
-        <td>${m.phaseType === 'single' ? 'Single Phase (1Φ)' : 'Three Phase (3Φ)'}</td>
+        <td>${m.phaseType === 'single' ? 'Single Phase (1P)' : 'Three Phase (3P)'}</td>
         <td>
           <span class="badge-status status-${m.installStatus.toLowerCase()}">${m.installStatus}</span>
         </td>
         <td><code>${m.dtCode || 'N/A'}</code></td>
         <td>
           <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #1e293b;" onclick="openMeterDetails('${m.meterId}')">
-            📊 Telemetry
+            View Readings
           </button>
         </td>
       </tr>
@@ -116,7 +111,6 @@ async function loadMeters(page = 1) {
   }
 }
 
-// Pagination footer
 function renderPagination(pg) {
   const footer = document.getElementById('paginationFooter');
   if (!pg || pg.totalPages <= 1) {
@@ -127,13 +121,12 @@ function renderPagination(pg) {
   footer.innerHTML = `
     <div>Showing page <strong>${pg.page}</strong> of <strong>${pg.totalPages}</strong> (${pg.total} meters)</div>
     <div style="display: flex; gap: 0.5rem;">
-      <button class="btn btn-secondary" style="color: #1e293b;" ${!pg.hasPrev ? 'disabled style="opacity: 0.5"' : ''} onclick="loadMeters(${pg.page - 1})">← Previous</button>
-      <button class="btn btn-secondary" style="color: #1e293b;" ${!pg.hasNext ? 'disabled style="opacity: 0.5"' : ''} onclick="loadMeters(${pg.page + 1})">Next →</button>
+      <button class="btn btn-secondary" style="color: #1e293b;" ${!pg.hasPrev ? 'disabled style="opacity: 0.5"' : ''} onclick="loadMeters(${pg.page - 1})">Previous</button>
+      <button class="btn btn-secondary" style="color: #1e293b;" ${!pg.hasNext ? 'disabled style="opacity: 0.5"' : ''} onclick="loadMeters(${pg.page + 1})">Next</button>
     </div>
   `;
 }
 
-// Open meter modal and fetch live consumption chart
 async function openMeterDetails(meterId) {
   const modal = document.getElementById('meterModal');
   modal.classList.add('open');
@@ -156,7 +149,6 @@ async function openMeterDetails(meterId) {
       <div class="np-item"><dt>Coordinates</dt><dd>${meter.location ? `${meter.location.latitude.toFixed(4)}, ${meter.location.longitude.toFixed(4)}` : 'N/A'}</dd></div>
     `;
 
-    // Fetch consumption readings
     const rRes = await fetch(`/api/v1/meters/${meterId}/readings`);
     if (!rRes.ok) {
       document.getElementById('consumptionSummary').innerHTML = '<div class="text-muted">No telemetry readings available for this meter.</div>';
@@ -178,12 +170,10 @@ async function openMeterDetails(meterId) {
   }
 }
 
-// Render Chart.js consumption line chart
 function renderChart(readings) {
   const ctx = document.getElementById('consumptionChart').getContext('2d');
   if (chartInstance) chartInstance.destroy();
 
-  // Take the most recent 48 intervals (24 hours) for visual clarity
   const sample = readings.slice(-48);
   const labels = sample.map(r => r.timestamp.split(' ')[1] || r.timestamp);
   const kwhData = sample.map(r => r.kwh);
@@ -245,7 +235,6 @@ function closeModalOnBg(e) {
   if (e.target.id === 'meterModal') closeModal();
 }
 
-// Network hierarchy recursive render
 async function loadHierarchy() {
   const container = document.getElementById('hierarchyView');
   container.innerHTML = '<div class="text-center py-4 text-muted">Building tree...</div>';
@@ -258,10 +247,10 @@ async function loadHierarchy() {
         return `
           <div class="tree-node">
             <div class="tree-header" onclick="this.nextElementSibling.classList.toggle('d-none')">
-              <span class="tree-toggle">▶</span>
+              <span class="tree-toggle">&gt;</span>
               <span class="tree-type-badge">${node.type}</span>
               <span>${node.name} (${node.code})</span>
-              <span class="text-muted text-sm">— ${node.meterCount} meters attached</span>
+              <span class="text-muted text-sm">- ${node.meterCount} meters attached</span>
             </div>
             <div class="d-none" style="margin-left: 1.5rem; margin-top: 0.25rem;">
               <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 0;">
@@ -279,7 +268,7 @@ async function loadHierarchy() {
       return `
         <div class="tree-node">
           <div class="tree-header" onclick="this.nextElementSibling.classList.toggle('d-none')">
-            <span class="tree-toggle">▼</span>
+            <span class="tree-toggle">v</span>
             <span class="tree-type-badge">${node.type}</span>
             <span>${node.name}</span>
           </div>
@@ -296,7 +285,6 @@ async function loadHierarchy() {
   }
 }
 
-// Load transformers
 async function loadTransformers() {
   const tbody = document.getElementById('transformersTableBody');
   tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Loading transformers...</td></tr>';
@@ -310,7 +298,7 @@ async function loadTransformers() {
         <td><code>${t.feederCode}</code></td>
         <td><span class="badge-status status-installed">${t.capacityKva} kVA</span></td>
         <td><strong>${t.meterCount}</strong> smart meters</td>
-        <td><span class="text-emerald">● Operational</span></td>
+        <td><span class="text-emerald">Operational</span></td>
       </tr>
     `).join('');
   } catch (err) {
@@ -318,13 +306,12 @@ async function loadTransformers() {
   }
 }
 
-// Geographic Map via Leaflet
 async function initMap() {
   const jaipurCenter = [26.9124, 75.7873];
   mapInstance = L.map('meterMap').setView(jaipurCenter, 12);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
+    attribution: 'OpenStreetMap contributors'
   }).addTo(mapInstance);
 
   try {
@@ -350,7 +337,7 @@ async function initMap() {
             Make: ${m.make}<br/>
             DT: ${m.dtCode}<br/>
             Status: <strong>${m.installStatus}</strong><br/><br/>
-            <button onclick="openMeterDetails('${m.meterId}')" style="background: #2563eb; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">View Telemetry</button>
+            <button onclick="openMeterDetails('${m.meterId}')" style="background: #2563eb; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">View Readings</button>
           </div>
         `);
         mapMarkers.push(marker);
@@ -363,7 +350,6 @@ async function initMap() {
   }
 }
 
-// Proximity search on map
 async function searchNearby() {
   const radius = document.getElementById('radiusInput').value || 5;
   const jaipurLat = 26.9389;
@@ -372,13 +358,12 @@ async function searchNearby() {
   try {
     const res = await fetch(`/api/v1/meters/nearby?lat=${jaipurLat}&lng=${jaipurLng}&radiusKm=${radius}&limit=50`);
     const data = await res.json();
-    alert(`Found ${data.totalFound} smart meters within ${radius} km radius of Jaipur grid center!`);
+    alert(`Found ${data.totalFound} smart meters within ${radius} km radius of Jaipur grid center.`);
   } catch (err) {
     alert('Nearby search failed: ' + err.message);
   }
 }
 
-// Live Portal Sync trigger
 async function triggerSync() {
   const btn = document.getElementById('syncBtn');
   btn.disabled = true;
@@ -386,18 +371,17 @@ async function triggerSync() {
   try {
     const res = await fetch('/api/v1/sync', { method: 'POST' });
     const json = await res.json();
-    alert(`Sync completed! ${json.result.metersCount} meters refreshed from portal.`);
+    alert(`Sync completed. ${json.result.metersCount} meters refreshed from portal.`);
     loadHealth();
     loadMeters(1);
   } catch (err) {
     alert('Sync error: ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerText = '🔄 Sync Portal';
+    btn.innerText = 'Sync Portal';
   }
 }
 
-// Initial bootstrap
 document.addEventListener('DOMContentLoaded', () => {
   loadHealth();
   loadMeters(1);

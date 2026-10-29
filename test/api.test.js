@@ -4,7 +4,7 @@ const http = require('http');
 const { start } = require('../src/server');
 
 let server;
-const baseUrl = 'http://localhost:3000';
+let baseUrl = '';
 
 function get(path) {
   return new Promise((resolve, reject) => {
@@ -23,7 +23,10 @@ function get(path) {
 }
 
 test.before(async () => {
-  server = await start();
+  // Use port 0 so the OS picks any free port, avoiding collisions with running local servers
+  server = await start(0);
+  const port = server.address().port;
+  baseUrl = `http://localhost:${port}`;
 });
 
 test.after(() => {
@@ -98,7 +101,6 @@ test('GET /api/v1/meters/nearby calculates spatial proximity', async () => {
   assert.equal(res.status, 200);
   assert.ok(res.data.totalFound > 0);
   assert.ok(res.data.data[0].distanceKm <= 5);
-  // Verify sorting by distance ascending
   for (let i = 1; i < res.data.data.length; i++) {
     assert.ok(res.data.data[i].distanceKm >= res.data.data[i - 1].distanceKm);
   }
