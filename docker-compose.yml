@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  urja-api:
+    build: .
+    container_name: urja-meter-ops-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - PORTAL_BASE_URL=https://urja-ops.flockenergy.tech
+      - PORTAL_USERNAME=operator@urja.local
+      - PORTAL_PASSWORD=urja-ops-2026
+      - CACHE_TTL_MS=300000
+      - AUTO_SYNC=true

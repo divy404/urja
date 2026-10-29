@@ -1,0 +1,20 @@
+{
+  "name": "urja-meter-ops-api",
+  "version": "1.0.0",
+  "description": "Clean, documented, resilient API gateway over the legacy Urja Meter Ops portal",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "keywords": ["smart-meter", "energy-api", "urja", "flock-energy", "rest-api", "swagger"],
+  "author": "Engineering Candidate",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "swagger-ui-express": "^5.0.1"
+  }
+}

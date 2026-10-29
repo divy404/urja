@@ -1,0 +1,317 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Urja Meter Ops Gateway API",
+    "version": "1.0.0",
+    "description": "A clean, modern, well-documented REST API gateway built over the legacy Urja Meter Ops utility portal. Exposes meters, transformers, grid network hierarchy, spatial proximity queries, and live 30-minute interval consumption timeseries with automatic session management and HMAC-signed bulk sync.",
+    "contact": {
+      "name": "Flock Energy Engineering Evaluation"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local API Service"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Meters",
+      "description": "Smart-meter discovery, details, spatial search, and consumption readings"
+    },
+    {
+      "name": "Transformers",
+      "description": "Distribution transformer (DT) management and attached meter mapping"
+    },
+    {
+      "name": "Network",
+      "description": "Utility grid hierarchy tree navigation"
+    },
+    {
+      "name": "System",
+      "description": "Health checks, cache status, and on-demand portal synchronization"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "System health and sync status",
+        "description": "Returns gateway uptime, cached entity counts, and legacy portal synchronization status.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "healthy",
+                  "timestamp": "2026-10-29T21:20:00.000Z",
+                  "uptimeSeconds": 120,
+                  "sync": {
+                    "status": "ready (live-synced)",
+                    "lastSyncedAt": "2026-10-29T21:18:00.000Z",
+                    "lastError": null
+                  },
+                  "counts": {
+                    "meters": 403,
+                    "transformers": 40,
+                    "cachedReadings": 5
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync": {
+      "post": {
+        "tags": ["System"],
+        "summary": "Trigger live portal sync",
+        "description": "Authenticates with Urja portal, fetches cryptographic keys, and executes HMAC-signed bulk export to refresh the local index.",
+        "responses": {
+          "200": {
+            "description": "Sync completed successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Live sync completed successfully",
+                  "result": {
+                    "success": true,
+                    "metersCount": 403,
+                    "transformersCount": 40,
+                    "syncedAt": "2026-10-29T21:20:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway - Portal sync failed"
+          }
+        }
+      }
+    },
+    "/api/v1/meters": {
+      "get": {
+        "tags": ["Meters"],
+        "summary": "List and filter meters",
+        "description": "Query meters with multi-parameter filtering (make, phase, status, dtCode) and keyword search across meter ID and serial number.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Keyword search (matches meterId or serialNo)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "make",
+            "in": "query",
+            "description": "Filter by meter manufacturer (e.g. HPL, L&T, Genus, Allied, Secure)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "description": "Filter by phase type (single or three)",
+            "schema": { "type": "string", "enum": ["single", "three"] }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by installation status",
+            "schema": { "type": "string", "enum": ["Installed", "Faulty", "Decommissioned"] }
+          },
+          {
+            "name": "dtCode",
+            "in": "query",
+            "description": "Filter by connected Distribution Transformer code (e.g. DT-001)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number (1-indexed)",
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size limit (max 100)",
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of meters"
+          }
+        }
+      }
+    },
+    "/api/v1/meters/nearby": {
+      "get": {
+        "tags": ["Meters"],
+        "summary": "Find meters near geographic coordinates",
+        "description": "Calculates Haversine distance from given (lat, lng) and returns nearest meters within radiusKm.",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "description": "Latitude coordinate",
+            "schema": { "type": "number", "example": 26.9389 }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "description": "Longitude coordinate",
+            "schema": { "type": "number", "example": 75.8309 }
+          },
+          {
+            "name": "radiusKm",
+            "in": "query",
+            "description": "Search radius in kilometers (default: 5km)",
+            "schema": { "type": "number", "default": 5 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of meters to return",
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meters found within radius, sorted by distance"
+          },
+          "400": {
+            "description": "Missing or invalid coordinates"
+          }
+        }
+      }
+    },
+    "/api/v1/meters/{id}": {
+      "get": {
+        "tags": ["Meters"],
+        "summary": "Get meter by ID",
+        "description": "Retrieves nameplate data, installation details, geographic coordinates, and grid hierarchy for a specific meter.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Meter identifier (e.g. J100000)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meter record details"
+          },
+          "404": {
+            "description": "Meter not found"
+          }
+        }
+      }
+    },
+    "/api/v1/meters/{id}/readings": {
+      "get": {
+        "tags": ["Meters"],
+        "summary": "Get live consumption readings",
+        "description": "Fetches 30-minute interval smart-meter energy consumption readings (kWh, kVAh, voltage) with summary statistics. Uses cache with stale-while-revalidate.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Meter identifier",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "fresh",
+            "in": "query",
+            "description": "Set to true to bypass cache and force a live fetch from the portal",
+            "schema": { "type": "boolean", "default": false }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption readings and interval summary"
+          },
+          "404": {
+            "description": "Meter or readings not found"
+          }
+        }
+      }
+    },
+    "/api/v1/transformers": {
+      "get": {
+        "tags": ["Transformers"],
+        "summary": "List distribution transformers",
+        "description": "List distribution transformers with connected meter counts and capacity filtering.",
+        "parameters": [
+          {
+            "name": "feederCode",
+            "in": "query",
+            "description": "Filter by Feeder code (e.g. F-001)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "minCapacity",
+            "in": "query",
+            "description": "Minimum transformer capacity in kVA",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "maxCapacity",
+            "in": "query",
+            "description": "Maximum transformer capacity in kVA",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of transformers"
+          }
+        }
+      }
+    },
+    "/api/v1/transformers/{code}": {
+      "get": {
+        "tags": ["Transformers"],
+        "summary": "Get transformer details and connected meters",
+        "description": "Retrieves transformer metadata alongside the list of all smart meters physically connected to this DT.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "description": "Distribution transformer code (e.g. DT-001)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transformer details and connected meters"
+          },
+          "404": {
+            "description": "Transformer not found"
+          }
+        }
+      }
+    },
+    "/api/v1/network/hierarchy": {
+      "get": {
+        "tags": ["Network"],
+        "summary": "Get full network hierarchy tree",
+        "description": "Reconstructed hierarchical tree of the utility grid: Zone -> Circle -> Division -> Subdivision -> Substation -> Feeder -> DT -> Meters.",
+        "responses": {
+          "200": {
+            "description": "Hierarchical network tree"
+          }
+        }
+      }
+    }
+  }
+}
